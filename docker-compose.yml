@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: aegis_mysql
+    environment:
+      MYSQL_DATABASE: aegischat_db
+      MYSQL_ROOT_PASSWORD: rootpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - aegis-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: aegis_minio
+    environment:
+      MINIO_ROOT_USER: aegisadmin
+      MINIO_ROOT_PASSWORD: aegispassword
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - aegis-net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: aegis_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - "5672:5672"
+      - "15672:15672" # Painel de gerenciamento do RabbitMQ
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - aegis-net
+
+volumes:
+  mysql_data:
+  minio_data:
+  rabbitmq_data:
+
+networks:
+  aegis-net:
+    driver: bridge
