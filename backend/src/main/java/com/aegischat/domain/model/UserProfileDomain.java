@@ -1,5 +1,6 @@
 package com.aegischat.domain.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,6 +14,7 @@ import java.time.ZonedDateTime;
 @AllArgsConstructor
 public class UserProfileDomain {
     private Long id;
+    @JsonIgnore
     private UserDomain user;
     private String username;
     private String displayName;

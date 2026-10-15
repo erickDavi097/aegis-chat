@@ -1,54 +1,56 @@
-version: '3.8'
-
 services:
-  mysql:
+  aegis-db:
     image: mysql:8.0
-    container_name: aegis_mysql
+    container_name: aegis-mysql
+    restart: always
     environment:
-      MYSQL_DATABASE: aegischat_db
       MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: aegischat_db
+      MYSQL_USER: aegis_user
+      MYSQL_PASSWORD: aegis_password
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ../database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - aegis_mysql_data:/var/lib/mysql
     networks:
-      - aegis-net
+      - aegis-network
 
-  minio:
-    image: minio/minio:latest
-    container_name: aegis_minio
+  aegis-rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: aegis-rabbitmq
+    restart: always
     environment:
-      MINIO_ROOT_USER: aegisadmin
-      MINIO_ROOT_PASSWORD: aegispassword
+      RABBITMQ_DEFAULT_USER: aegis_guest
+      RABBITMQ_DEFAULT_PASS: aegis_guestpass
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - aegis_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - aegis-network
+
+  aegis-minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: aegis-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: aegis_minio_admin
+      MINIO_ROOT_PASSWORD: aegis_minio_password
     ports:
       - "9000:9000"
       - "9001:9001"
-    command: server /data --console-address ":9001"
     volumes:
-      - minio_data:/data
+      - aegis_minio_data:/data
     networks:
-      - aegis-net
-
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: aegis_rabbitmq
-    environment:
-      RABBITMQ_DEFAULT_USER: admin
-      RABBITMQ_DEFAULT_PASS: password
-    ports:
-      - "5672:5672"
-      - "15672:15672" # Painel de gerenciamento do RabbitMQ
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-    networks:
-      - aegis-net
+      - aegis-network
 
 volumes:
-  mysql_data:
-  minio_data:
-  rabbitmq_data:
+  aegis_mysql_data:
+  aegis_rabbitmq_data:
+  aegis_minio_data:
 
 networks:
-  aegis-net:
+  aegis-network:
     driver: bridge

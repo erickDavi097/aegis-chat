@@ -17,8 +17,10 @@ export const MediaAttachment: React.FC<MediaAttachmentProps> = ({
 }) => {
   if (!mediaUrl) return null;
 
-  const isImage = mediaType.startsWith('image/') || mediaType === 'IMAGE';
-
+  const isImage = 
+    mediaType.startsWith('image/') || 
+    mediaType === 'IMAGE' || 
+    Boolean(mediaUrl?.match(/\.(jpeg|jpg|png|gif|webp)$/i));
   return (
     <div className="mt-2 rounded-xl overflow-hidden border border-slate-800 bg-slate-950/60 p-2 max-w-sm">
       {isImage ? (

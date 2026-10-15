@@ -106,6 +106,7 @@ interface ChatState {
   deleteChannelFromFolder: (groupId: number, folderId: number, channelId: number) => void;
   addDirectChat: (chat: DirectMessageChat) => void;
   addMessage: (message: Message) => void;
+  setChatHistory: (chatId: number, messages: Message[]) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -278,4 +279,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   addDirectChat: (chat) => set((state) => ({ directChats: [...state.directChats, chat] })),
 
   addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
+  
+  setChatHistory: (chatId, newMessages) => set((state) => {
+    // Remove mensagens antigas desse chat para não duplicar, e adiciona o histórico novo
+    const otherMessages = state.messages.filter(m => m.chatId !== chatId);
+    return { messages: [...otherMessages, ...newMessages] };
+  }),
 }));

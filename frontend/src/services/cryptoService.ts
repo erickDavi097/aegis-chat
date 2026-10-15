@@ -1,37 +1,63 @@
-//src/services/cryptoService.tsx
+//src/services/cryptoService.ts
 const DB_NAME = 'AegisChatCryptoDB';
 const STORE_NAME = 'keys';
 const PRIVATE_KEY_ID = 'user_private_identity_key';
+import { api } from "./api";
 
 export const CryptoService = {
-  /**
-   * Gera um par de chaves RSA-OAEP com extractable: true para permitir exportação local
-   */
+  // 1. Usa ECDH (Curva Elíptica) no lugar de RSA - Padrão Ouro para Chats
   async generateIdentityKeyPair(): Promise<CryptoKeyPair> {
     return await window.crypto.subtle.generateKey(
       {
-        name: "RSA-OAEP",
-        modulusLength: 2048,
-        publicExponent: new Uint8Array([1, 0, 1]),
-        hash: "SHA-256",
+        name: "ECDH",
+        namedCurve: "P-256", // Curva P-256
       },
-      true, // Obrigatório true para exportar a chave privada como JWK
-      ["encrypt", "decrypt"]
+      true, 
+      ["deriveKey", "deriveBits"]
     );
   },
 
-  /**
-   * Converte uma CryptoKey pública para formato Base64 (para envio ao backend)
-   */
   async exportPublicKeyToBase64(publicKey: CryptoKey): Promise<string> {
     const exported = await window.crypto.subtle.exportKey("spki", publicKey);
     const binary = String.fromCharCode(...new Uint8Array(exported));
     return btoa(binary);
   },
 
-  /**
-   * Salva a chave privada de forma segura no IndexedDB do navegador
-   */
+  // Nova função: Importar a chave pública do amiguinho (que virá do Backend em Base64)
+  async importPublicKeyFromBase64(base64Key: string): Promise<CryptoKey> {
+    const binary = atob(base64Key);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return await window.crypto.subtle.importKey(
+      "spki",
+      bytes,
+      { name: "ECDH", namedCurve: "P-256" },
+      true,
+      []
+    );
+  },
+
+  // Nova função mágica: Junta a minha Privada com a Pública do destinatário para criar a Chave AES
+  async deriveSharedSecret(myPrivateKey: CryptoKey, theirPublicKey: CryptoKey): Promise<CryptoKey> {
+    return await window.crypto.subtle.deriveKey(
+      {
+        name: "ECDH",
+        public: theirPublicKey,
+      },
+      myPrivateKey,
+      {
+        name: "AES-GCM",
+        length: 256,
+      },
+      false, // Não queremos que essa chave AES vaze de jeito nenhum
+      ["encrypt", "decrypt"]
+    );
+  },
+
+  // --- SEU CÓDIGO DE INDEXED_DB PERFEITO FICA INTACTO ABAIXO ---
+
   async savePrivateKeyToIndexedDB(privateKey: CryptoKey): Promise<void> {
     const jwk = await window.crypto.subtle.exportKey("jwk", privateKey);
     const db = await this.openDB();
@@ -40,15 +66,11 @@ export const CryptoService = {
       const transaction = db.transaction(STORE_NAME, 'readwrite');
       const store = transaction.objectStore(STORE_NAME);
       const request = store.put(jwk, PRIVATE_KEY_ID);
-      
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
   },
 
-  /**
-   * Recupera a chave privada do IndexedDB e a reimporta como CryptoKey
-   */
   async loadPrivateKeyFromIndexedDB(): Promise<CryptoKey | null> {
     try {
       const db = await this.openDB();
@@ -56,7 +78,6 @@ export const CryptoService = {
         const transaction = db.transaction(STORE_NAME, 'readonly');
         const store = transaction.objectStore(STORE_NAME);
         const request = store.get(PRIVATE_KEY_ID);
-        
         request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
       });
@@ -66,12 +87,9 @@ export const CryptoService = {
       return await window.crypto.subtle.importKey(
         "jwk",
         jwk,
-        {
-          name: "RSA-OAEP",
-          hash: "SHA-256",
-        },
+        { name: "ECDH", namedCurve: "P-256" }, // Atualizado para ECDH
         true,
-        ["decrypt"]
+        ["deriveKey", "deriveBits"]
       );
     } catch (error) {
       console.error('Error loading private key from IndexedDB:', error);
@@ -79,9 +97,6 @@ export const CryptoService = {
     }
   },
 
-  /**
-   * Abre ou inicializa o IndexedDB local
-   */
   async openDB(): Promise<IDBDatabase> {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, 1);
@@ -96,9 +111,6 @@ export const CryptoService = {
     });
   },
 
-  /**
-   * Limpa as chaves ao fazer logout
-   */
   async clearLocalKeys(): Promise<void> {
     try {
       const db = await this.openDB();
@@ -114,6 +126,7 @@ export const CryptoService = {
     }
   },
 
+  // Suas funções de encriptação ficam idênticas! Elas vão receber a chave que o deriveSharedSecret criar!
   async encryptMessage(secretKey: CryptoKey, plainText: string): Promise<{ cipherText: string; iv: string }> {
     const encoder = new TextEncoder();
     const encodedData = encoder.encode(plainText);
@@ -143,5 +156,52 @@ export const CryptoService = {
     );
 
     return decoder.decode(decryptedBuffer);
+  }
+};
+
+// Adicione isso no seu CryptoService ou em um arquivo de helpers E2EE
+
+export const E2EHelper = {
+  // Pega a chave pública de um usuário lá do nosso Backend
+  async fetchRecipientPublicKey(recipientProfileId: number): Promise<CryptoKey | null> {
+    try {
+      const response = await api.get(`/keys/${recipientProfileId}`);
+      const base64Key = response.data.publicIdentityKey;
+      return await CryptoService.importPublicKeyFromBase64(base64Key);
+    } catch (error) {
+      console.error("Erro ao buscar chave do destinatário", error);
+      return null;
+    }
+  },
+
+  // Criptografa o texto e retorna no formato: "IV_BASE64.TEXTO_CIFRADO_BASE64"
+  async encryptForRecipient(text: string, recipientPublicKey: CryptoKey): Promise<string> {
+    const myPrivateKey = await CryptoService.loadPrivateKeyFromIndexedDB();
+    if (!myPrivateKey) throw new Error("Chave privada não encontrada no IndexedDB");
+
+    // A Mágica: Deriva a chave secreta AES única entre você e o destinatário
+    const sharedSecret = await CryptoService.deriveSharedSecret(myPrivateKey, recipientPublicKey);
+    
+    // Criptografa o texto
+    const { cipherText, iv } = await CryptoService.encryptMessage(sharedSecret, text);
+    
+    // Junta tudo para caber na coluna encrypted_payload do banco
+    return `${iv}.${cipherText}`;
+  },
+
+  // Descriptografa a mensagem que veio no formato "IV_BASE64.TEXTO_CIFRADO_BASE64"
+  async decryptFromSender(encryptedPayload: string, senderPublicKey: CryptoKey): Promise<string> {
+    if (!encryptedPayload.includes('.')) {
+      return encryptedPayload; // Provavelmente é uma mensagem antiga/mockada
+    }
+
+    const [iv, cipherText] = encryptedPayload.split('.');
+    
+    const myPrivateKey = await CryptoService.loadPrivateKeyFromIndexedDB();
+    if (!myPrivateKey) throw new Error("Chave privada não encontrada");
+
+    const sharedSecret = await CryptoService.deriveSharedSecret(myPrivateKey, senderPublicKey);
+    
+    return await CryptoService.decryptMessage(sharedSecret, cipherText, iv);
   }
 };

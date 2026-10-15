@@ -9,13 +9,15 @@ import com.aegischat.usecase.gateway.MessageRepositoryGateway;
 import com.aegischat.usecase.gateway.UserRepositoryGateway;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration
 public class UseCaseConfig {
 
     @Bean
-    public RegisterUserUseCase registerUserUseCase(UserRepositoryGateway userRepositoryGateway) {
-        return new RegisterUserUseCase(userRepositoryGateway);
+    public RegisterUserUseCase registerUserUseCase(UserRepositoryGateway userRepositoryGateway, PasswordEncoder passwordEncoder,
+                                                   EncryptionGateway encryptionGateway) {
+        return new RegisterUserUseCase(userRepositoryGateway, passwordEncoder, encryptionGateway);
     }
     @Bean
     public SendMessageUseCase sendMessageUseCase(

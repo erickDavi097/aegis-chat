@@ -41,12 +41,12 @@ class UserRepositoryAdapterTest {
     @Test
     @DisplayName("Should successfully check if username exists delegating to Spring Data repository")
     void testExistsByUsername() {
-        when(springDataUserRepository.existsByUsername("erickdev")).thenReturn(false);
+        when(springDataUserRepository.existsByProfilesUsername("erickdev")).thenReturn(false);
 
         boolean exists = userRepositoryAdapter.existsByUsername("erickdev");
 
         assertFalse(exists);
-        verify(springDataUserRepository, times(1)).existsByUsername("erickdev");
+        verify(springDataUserRepository, times(1)).existsByProfilesUsername("erickdev");
     }
 
     @Test

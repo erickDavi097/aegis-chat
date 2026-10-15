@@ -28,5 +28,13 @@ public record RegisterRequestDto(
 
         @NotBlank(message = "Display name is required")
         @Size(max = 100, message = "Display name cannot exceed 100 characters")
-        String displayName
+        String displayName,
+
+        // --- Novos campos para o Ciclo 04: E2EE ---
+
+        @NotBlank(message = "Public Identity Key is required for E2EE")
+        String publicIdentityKey,
+
+        @NotBlank(message = "Public Signed Pre Key is required for E2EE")
+        String publicSignedPreKey
 ) {}

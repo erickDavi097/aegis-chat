@@ -1,38 +1,38 @@
-# resources/application.yml
 server:
   port: 8080
 
 spring:
   application:
-    name: aegischat-backend
+    name: aegis-chat-backend
+
   datasource:
-    url: jdbc:mysql://localhost:3306/aegischat_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
-    username: root
-    password: rootpassword
+    url: jdbc:mysql://localhost:3307/aegischat_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: aegis_user
+    password: aegis_password
     driver-class-name: com.mysql.cj.jdbc.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      idle-timeout: 30000
-      connection-timeout: 20000
+
   jpa:
     hibernate:
-      ddl-auto: validate # Valida estritamente contra o schema.sql do banco
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
-        format_sql: true
+
   rabbitmq:
     host: localhost
     port: 5672
-    username: admin
-    password: password
+    username: aegis_guest
+    password: aegis_guestpass
 
-logging:
-  level:
-    root: INFO
-    com.aegischat: DEBUG
-    org.springframework.web: INFO
-    org.hibernate.SQL: DEBUG
-    org.springframework.amqp: INFO
+# ATENÇÃO AQUI: minio e aegis agora estão totalmente alinhados à esquerda (fora do bloco spring)
+minio:
+  url: http://localhost:9000
+  access-key: aegis_minio_admin
+  secret-key: aegis_minio_password
+  bucket-name: aegischat-media
+
+aegis:
+  jwt:
+    secret: "c3VwZXItc2VjcmV0LWtleS1mb3ItYWVnaXMtY2hhdC16ZXJvLWtub3dsZWRnZS1zZWN1cml0eS0yMDI2"
+    expiration-ms: 86400000 # 24 horas

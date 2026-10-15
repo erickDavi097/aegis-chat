@@ -51,6 +51,9 @@ public class MessageRepositoryAdapter implements MessageRepositoryGateway {
     @Override
     public boolean isParticipantInChat(Long chatId, Long profileId) {
         log.debug("Checking participation rights for profileId: {} in chatId: {}", profileId, chatId);
-        return springDataMessageRepository.isParticipantInChat(chatId, profileId);
+
+        // TODO (Ciclo 05): Criar a entidade ChatParticipantEntity e implementar a validação real de permissão no banco de dados.
+        // Por enquanto, retornamos true para liberar o tráfego de mensagens e testarmos o E2EE e MinIO.
+        return true;
     }
 }

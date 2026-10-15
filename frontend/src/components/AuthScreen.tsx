@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { api } from '../services/api';
 import { useAuthStore } from '../store/useAuthStore';
+import { CryptoService } from '../services/cryptoService'; // <-- Importe o serviço de criptografia
 
 export const AuthScreen: React.FC = () => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -22,35 +23,44 @@ export const AuthScreen: React.FC = () => {
 
     try {
       if (isRegistering) {
+        // 1. Gera as chaves criptográficas ANTES de bater na API
+        console.log("Gerando chaves criptográficas ECDH...");
+        const keyPair = await CryptoService.generateIdentityKeyPair();
+
+        // 2. Salva a Chave Privada em segurança no navegador (IndexedDB)
+        await CryptoService.savePrivateKeyToIndexedDB(keyPair.privateKey);
+
+        // 3. Converte a Chave Pública para Base64 para enviar ao backend
+        const publicKeyBase64 = await CryptoService.exportPublicKeyToBase64(keyPair.publicKey);
+
+        // 4. Envia o cadastro com a chave pública embutida no payload
         await api.post('/auth/register', {
           email,
           password,
           username,
           displayName,
-          phoneNumber: phoneNumber || '+5511999999999',
+          phoneNumber: phoneNumber || undefined,
+          publicIdentityKey: publicKeyBase64, // <-- Enviando para a tabela user_keys
+          publicSignedPreKey: "NA",           // <-- Placeholder para futuras assinaturas
         });
-        alert('Cadastro realizado com sucesso! Faça login.');
+        
+        alert('Cadastro realizado com sucesso! Suas chaves E2EE foram geradas. Faça login.');
         setIsRegistering(false);
       } else {
-        const response = await api.post('/auth/login', { email, password }).catch(() => {
-          return { data: { token: 'mock-jwt-token-aegis' } };
-        });
+        // Fluxo de Login
+        const response = await api.post('/auth/login', { email, password });
         
-        const token = response.data.token || 'mock-jwt-token-aegis';
+        const { token, user } = response.data;
         
-        // Simulação de dados do usuário autenticado para o front
-        const mockUser = {
-          id: 5,
-          username: username || email.split('@')[0],
-          displayName: displayName || 'Usuário Aegis',
-          email: email
-        };
-
-        setAuthData(token, mockUser);
+        // Seta o AuthData real vindo do Spring Boot
+        setAuthData(token, user);
+        
+        // Inicia a geração E2EE (ou carrega a chave privada do IndexedDB se já existir)
         await initUserKeys();
       }
     } catch (err: any) {
-      setError('Falha na autenticação. Verifique os dados informados.');
+      console.error(err);
+      setError(err.response?.data?.message || 'Falha na autenticação. Verifique os dados informados.');
     } finally {
       setLoading(false);
     }
